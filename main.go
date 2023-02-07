@@ -102,17 +102,16 @@ import (
 
 	MySmartContract "test/gen"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// var infuraURL = "http://127.0.0.1:8545"
-var infuraURL = "https://goerli.infura.io/v3/e8e3634a88d0418c9a54b3c03b345925"
-var Pki = "0d03a89dbe214d61bdfd8afec6ca5c46cf4ccb205820bdd10a7834b5e7cd4db7"
+var infuraURL = "http://127.0.0.8545"
+var Pki = "Private Key"
 var contractAddress = "0xCAFBb81820fD028dd83ef148815b4d1519aa16F6"
-var numberOfEvents = big.NewInt(1)
+var numberOfEvents = big.NewInt(2)
 
 func main() {
 	client, err := ethclient.DialContext(context.Background(), infuraURL)
@@ -152,7 +151,7 @@ func main() {
 
 	c := make(chan string)
 
-	for i := 1; i <= 5; i++ {
+	for i := 1; i <= 100; i++ {
 		go callContract(client, contract, privateKey, userAddress, c)
 		fmt.Println(<-c, i, "Times")
 	}
@@ -160,12 +159,12 @@ func main() {
 }
 
 func callContract(client *ethclient.Client, contract *MySmartContract.MySmartContract, privateKey *ecdsa.PrivateKey, userAddress common.Address, c chan string) {
-	// chainID, err := client.ChainID(context.Background())
-	// if err != nil {
-	// 	log.Fatalf("Error in chainID  key:%v", err)
-	// 	c <- `Error in ChainID`
+	chainID, err := client.ChainID(context.Background())
+	if err != nil {
+		log.Fatalf("Error in chainID  key:%v", err)
+		c <- `Error in ChainID`
 
-	// }
+	}
 
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
@@ -175,68 +174,42 @@ func callContract(client *ethclient.Client, contract *MySmartContract.MySmartCon
 	}
 
 	nonce, err := client.PendingNonceAt(context.Background(), userAddress)
+
 	if err != nil {
 		c <- `Error in nounce`
 		panic(err)
 
 	}
 
-	// tx, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
-
-	// if err != nil {
-	// 	log.Fatalf("Tx err :%v", err)
-	// 	c <- `Error in Tx`
-
-	// }
-	toAddress := common.HexToAddress(contractAddress)
-	gasLimit := uint64(3000000)
-	// var data []byterawTxHex
-	value := big.NewInt(0)
-	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, nil)
-
-	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, privateKey)
+	tx, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
 	if err != nil {
-		fmt.Println("Error in signed Transaction", err)
-		c <- `Error in Producing Event`
+		log.Fatalf("Tx err :%v", err)
+		c <- `Error in Tx`
+
 	}
 
-	err = client.SendTransaction(context.Background(), signedTx)
+	tx.GasLimit = 3000000
+	tx.GasPrice = gasPrice
+	tx.Nonce = big.NewInt(int64(nonce))
+	tx.Value = big.NewInt(0)
+	txHash, err := contract.ProduceEvents(tx, numberOfEvents)
+
 	if err != nil {
-		fmt.Println("Error sending transaction:", err)
+		log.Fatalf("Calling Contract Faild:%v", err)
 		c <- `Error in Producing Event`
+
+	}
+	fmt.Println("Transaction Hash", txHash.Hash().Hex())
+
+	eventCounter, err := contract.EventCounter(&bind.CallOpts{
+		From: userAddress,
+	})
+
+	if err != nil {
+		log.Fatalf("Getting new Value Error:%v", err)
+
 	}
 
-	fmt.Printf(signedTx.Hash().Hex()) //
-
-	// fmt.Println("GasPrice", gasPrice)
-	// fmt.Println("nounce", nonce)
-	// fmt.Println("chainid", chainID)
-
-	// tx.GasLimit = 3000000
-	// tx.GasPrice = gasPrice
-	// tx.Nonce = big.NewInt(int64(nonce))
-	// tx.Value = big.NewInt(0)
-
-	// tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)
-
-	// txHash, err := contract.ProduceEvents(tx, numberOfEvents)
-	// if err != nil {
-	// 	log.Fatalf("Calling Contract Faild:%v", err)
-	// 	c <- `Error in Producing Event`
-
-	// }
-
-	// fmt.Println("Transaction Hash", txHash.Hash().Hex())
-
-	// eventCounter, err := contract.EventCounter(&bind.CallOpts{
-	// 	From: userAddress,
-	// })
-
-	// if err != nil {
-	// 	log.Fatalf("Getting new Value Error:%v", err)
-
-	// }
-
-	// fmt.Println("New Event Counter : ", eventCounter)
+	fmt.Println("New Event Counter : ", eventCounter)
 	c <- `Produced event`
 }
