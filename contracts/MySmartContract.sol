@@ -2,7 +2,7 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-contract MyContract {
+contract MySmartContract {
     uint256 public eventCounter;
     event Event(uint256 Counter);
 
