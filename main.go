@@ -109,9 +109,10 @@ import (
 )
 
 var infuraURL = "http://127.0.0.8545"
-var Pki = "Private Key"
-var contractAddress = "0xCAFBb81820fD028dd83ef148815b4d1519aa16F6"
-var numberOfEvents = big.NewInt(2)
+var Pki = "PKI"
+var contractAddress = "0x051d6f58aAceb4bC9C2b44898AD8093e967728D8"
+var numberOfEvents = big.NewInt(1000)
+var concurrentConnections = 100
 
 func main() {
 	client, err := ethclient.DialContext(context.Background(), infuraURL)
@@ -151,8 +152,11 @@ func main() {
 
 	c := make(chan string)
 
-	for i := 1; i <= 100; i++ {
+	for i := 1; i <= concurrentConnections; i++ {
 		go callContract(client, contract, privateKey, userAddress, c)
+	}
+
+	for i := 1; i <= concurrentConnections; i++ {
 		fmt.Println(<-c, i, "Times")
 	}
 
